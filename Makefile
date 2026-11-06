@@ -54,7 +54,7 @@ $(PROBE_ELF): src/probe.c
 	    -DPROBE_HIGH=$(PROBE_HIGH) \
 	    -o $@ $<
 
-layout.h: layout.json scripts/layout-to-header.py scripts/ps5-kernel-receiver.py
+layout.h: layout.json scripts/layout-to-header.py scripts/receiver.py
 	$(PYTHON) scripts/layout-to-header.py --layout $< --output $@
 
 RESUME_FROM ?= 0

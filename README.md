@@ -2,15 +2,13 @@
 
 Captures a live kernel memory image from a PS5 running firmware 13.20, producing the same output shape as `ps5-13.60-kernel-dump`: a flat binary with kernel text followed by kernel data, a JSON manifest with virtual addresses and hashes, and a gzip-compressed copy — ready for Ghidra.
 
-Two console payloads and three host scripts:
+Two console payloads and one host CLI:
 
 | File | Runs on | Purpose |
 |------|---------|---------|
 | `src/probe.c` → `ps5-kernel-probe.elf` | Console | Discovers kernel text/data addresses and data size |
-| `scripts/probe-receiver.py` | Host | Receives probe result, writes `layout.json` |
 | `src/dumper.c` → `ps5-kernel-dumper.elf` | Console | Streams kernel pages to the receiver |
-| `scripts/ps5-kernel-receiver.py` | Host | Receives pages, checkpoints, optionally flattens |
-| `scripts/assemble-dump.py` | Host | Produces the final `.bin` + `.json` + `.gz` |
+| `scripts/receiver.py` | Host | All host-side stages: `probe`, `receive`, `assemble` |
 
 ## Prerequisites
 
@@ -21,7 +19,7 @@ Two console payloads and three host scripts:
 3. Resume — Byepervisor confirms "hypervisor is defeated" and shows the first 8 bytes of kernel text
 4. Now deploy the probe and dumper payloads (same boot, same elfldr session)
 
-See the [Byepervisor Reborn](https://github.com/idlesauce/Byepervisor-Reborn) README for setup details (USB power settings, pro vs non-pro detection).
+See the [Byepervisor Reborn](https://github.com/PS5Dev/Byepervisor-Reborn) README for setup details (USB power settings, pro vs non-pro detection).
 
 ## Deploy
 
@@ -45,7 +43,7 @@ socat -t 9999999 - TCP:<PS5-IP>:9021 < ps5-kernel-probe.elf
 
 # 1. Build and run the probe to discover kernel addresses
 make probe PS5_PAYLOAD_SDK=/path/to/sdk RECEIVER_HOST=<HOST-IP>
-python3 scripts/probe-receiver.py --bind 0.0.0.0 --port 8889 --boot-id my-boot-01
+python3 scripts/receiver.py probe --bind 0.0.0.0 --port 8889 --boot-id my-boot-01
 # (deploy and run ps5-kernel-probe.elf on the console)
 # → writes layout.json
 
@@ -53,13 +51,13 @@ python3 scripts/probe-receiver.py --bind 0.0.0.0 --port 8889 --boot-id my-boot-0
 make PS5_PAYLOAD_SDK=/path/to/sdk RECEIVER_HOST=<HOST-IP> RECEIVER_PORT=8888
 
 # 3. Start the receiver on the host
-python3 scripts/ps5-kernel-receiver.py --layout layout.json --output capture/ \
+python3 scripts/receiver.py receive --layout layout.json --output capture/ \
     --bind 0.0.0.0 --port 8888 --flat
 
 # 4. Deploy and run ps5-kernel-dumper.elf on the console
 
 # 5. Assemble the final dump
-python3 scripts/assemble-dump.py --capture capture/ --output dump/ --firmware-label 13.20
+python3 scripts/receiver.py assemble --capture capture/ --output dump/ --firmware-label 13.20
 ```
 
 The output in `dump/` will contain `kernel-13.20-live.bin`, `kernel-13.20-live.bin.gz`, and `kernel-13.20-live.bin.json`.
@@ -68,7 +66,7 @@ The output in `dump/` will contain `kernel-13.20-live.bin`, `kernel-13.20-live.b
 
 `make probe PS5_PAYLOAD_SDK=... RECEIVER_HOST=...` builds `ps5-kernel-probe.elf`. The probe reads `KERNEL_ADDRESS_TEXT_BASE` and `KERNEL_ADDRESS_DATA_BASE` from the SDK at runtime, then binary-searches for the last readable data page (~12 `kernel_copyout` calls over a 128 MiB window). It sends one JSON line with the results and disconnects.
 
-On the host, `python3 scripts/probe-receiver.py --bind 0.0.0.0 --port 8889 --boot-id <id>` listens for the probe, validates the geometry, and writes `layout.json`. The boot ID must be unique per boot.
+On the host, `python3 scripts/receiver.py probe --bind 0.0.0.0 --port 8889 --boot-id <id>` listens for the probe, validates the geometry, and writes `layout.json`. The boot ID must be unique per boot.
 
 ## Layout
 
@@ -78,7 +76,7 @@ For 13.20 the SDK says `KERNEL_ADDRESS_TEXT_BASE = KERNEL_ADDRESS_DATA_BASE - 0x
 
 ## Receiver
 
-Run: `python3 scripts/ps5-kernel-receiver.py --layout layout.json --output /path/to/capture` (defaults to `127.0.0.1:8888`; `--bind` and `--port` override). The server accepts sessions until a valid EOF. Bind to a non-loopback address only on a trusted isolated network; the wire protocol has no authentication or encryption. Do not expose it to untrusted peers.
+Run: `python3 scripts/receiver.py receive --layout layout.json --output /path/to/capture` (defaults to `127.0.0.1:8888`; `--bind` and `--port` override). The server accepts sessions until a valid EOF. Bind to a non-loopback address only on a trusted isolated network; the wire protocol has no authentication or encryption. Do not expose it to untrusted peers.
 
 Protocol: one TCP connection begins with a newline-terminated JSON object `{"type":"hello", ...layout fields...}` matching the layout exactly. Then each `page` line has `type`, `addr`, `length`, `status` (`ok` or `error`), `errno` (zero for ok, positive for error), `sha256` (lowercase hex SHA-256 for ok, null for error). Immediately after an `ok` header send exactly `length` raw bytes; error headers carry no binary bytes. End with `{"type":"eof"}\n`. No acknowledgements are sent; reconnect and resend pages after disconnect. A conflicting previously verified page is rejected; failed pages may be retried. A zero page is recorded only after its transmitted bytes pass SHA-256 verification.
 
@@ -92,7 +90,7 @@ WARNING: SDK `kernel_copyout` mutates kernel pipe metadata on every call, so pip
 
 ## Assembly
 
-After a complete capture, `python3 scripts/assemble-dump.py --capture capture/ --output dump/ --firmware-label 13.20` produces:
+After a complete capture, `python3 scripts/receiver.py assemble --capture capture/ --output dump/ --firmware-label 13.20` produces:
 
 - `kernel-13.20-live.bin` — raw text+data, contiguous
 - `kernel-13.20-live.bin.gz` — gzip-compressed copy

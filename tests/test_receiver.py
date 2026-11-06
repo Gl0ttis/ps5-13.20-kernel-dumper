@@ -8,7 +8,7 @@ import threading
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('receiver', ROOT / 'scripts' / 'ps5-kernel-receiver.py')
+spec = importlib.util.spec_from_file_location('receiver', ROOT / 'scripts' / 'receiver.py')
 receiver = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(receiver)
 LAYOUT = {'firmware': '0x13200006', 'boot_id': 'test-boot', 'base': 4096,

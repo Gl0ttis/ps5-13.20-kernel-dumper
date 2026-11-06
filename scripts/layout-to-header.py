@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-spec = importlib.util.spec_from_file_location('receiver', ROOT / 'ps5-kernel-receiver.py')
+spec = importlib.util.spec_from_file_location('receiver', ROOT / 'receiver.py')
 receiver = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(receiver)
 
