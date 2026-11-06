@@ -1,0 +1,21 @@
+# Build artifacts
+*.elf
+*.o
+*.bin
+*.prx
+*.sprx
+layout.h
+
+# Capture / dump output (machine-specific)
+dump/
+capture/
+layout.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor / OS cruft
+.vscode/
+.DS_Store
+*.swp

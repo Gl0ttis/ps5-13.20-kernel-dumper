@@ -1,0 +1,27 @@
+# This is a template, not valid JSON (comments must be removed).
+# Fill in the actual addresses from your console's KERNEL_ADDRESS_TEXT_BASE
+# and KERNEL_ADDRESS_DATA_BASE (SDK globals, available at runtime).
+#
+# For 13.20 the SDK says: TEXT_BASE = DATA_BASE - 0xCB0000
+# so text size (range 0 length) = 0xCB0000 = 13,238,272 bytes.
+#
+# Data size (range 1 length) must be determined independently.
+# The 13.60 kernel has ~86 MiB of data; 13.20 will be similar.
+# If unsure, use the preflight payload to probe KERNEL_ADDRESS_DATA_BASE
+# and a candidate data size, or use a known-good value from prior work.
+#
+# boot_id must be unique per boot — never reuse after a reboot.
+# base must be <= the lowest range start.
+# All addresses are absolute virtual addresses as integers.
+#
+# Example (addresses are placeholders):
+{
+  "firmware": "0x13200006",
+  "boot_id": "CHANGE-ME-unique-per-boot",
+  "base": 18446744073085001728,
+  "page_size": 65536,
+  "ranges": [
+    {"start": 18446744073085001728, "length": 13238272},
+    {"start": 18446744073098240000, "length": 88080384}
+  ]
+}
